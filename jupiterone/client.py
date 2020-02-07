@@ -20,6 +20,7 @@ from jupiterone.constants import (
     QUERY_V1,
     CREATE_ENTITY,
     DELETE_ENTITY,
+    UPDATE_ENTITY,
     CREATE_RELATIONSHIP,
     DELETE_RELATIONSHIP
 )
@@ -79,18 +80,12 @@ class JupiterOneClient:
 
     # pylint: disable=R1710
     @retry(**RETRY_OPTS)
-    def _execute_query(self, query: str, **kwargs) -> Dict:
+    def _execute_query(self, query: str, variables: Dict = None) -> Dict:
         """ Executes query against graphql endpoint """
-        variables: Dict = kwargs.pop('variables', None)
-        include_deleted: bool = kwargs.pop('include_deleted', False)
-        dry_run: bool = kwargs.pop('dry_run', False)
 
-        data = dict(
-            query=query,
-            dryRun=dry_run,
-            includeDeleted=include_deleted
-        )
-
+        data = {
+            'query': query
+        }
         if variables:
             data.update(variables=variables)
 
@@ -117,23 +112,22 @@ class JupiterOneClient:
                 skip (int):  Skip entity count
                 limit (int): Limit entity count
                 include_deleted (bool): Include recently deleted entities in query/search
-                dry_run (bool): Execute in dry run mode
         """
         skip: int = kwargs.pop('skip', J1QL_SKIP_COUNT)
         limit: int = kwargs.pop('limit', J1QL_LIMIT_COUNT)
         include_deleted: bool = kwargs.pop('include_deleted', False)
-        dry_run: bool = kwargs.pop('dry_run', False)
 
         results: List = []
         page: int = 0
 
         while True:
-            variables = {'query': f"{query} SKIP {page * skip} LIMIT {limit}"}
+            variables = {
+                'query': f"{query} SKIP {page * skip} LIMIT {limit}",
+                'includeDeleted': include_deleted
+            }
             response = self._execute_query(
                 query=QUERY_V1,
-                variables=variables,
-                include_deleted=include_deleted,
-                dry_run=dry_run
+                variables=variables
             )
 
             data = response['data']['queryV1']['data']
@@ -160,7 +154,6 @@ class JupiterOneClient:
             entity_class (str): Value for _class of entity
             timestamp (int): Specify createdOn timestamp
             properties (dict): Dictionary of key/value entity properties
-            dry_run (bool): Execute in dry run mode.  Default is False.
         """
         variables = {
             'entityKey': kwargs.pop('entity_key'),
@@ -170,7 +163,6 @@ class JupiterOneClient:
 
         timestamp: int = kwargs.pop('timestamp', None)
         properties: Dict = kwargs.pop('properties', None)
-        dry_run: bool = kwargs.pop('dry_run', False)
 
         if timestamp:
             variables.update(timestamp=timestamp)
@@ -179,23 +171,36 @@ class JupiterOneClient:
 
         response = self._execute_query(
             query=CREATE_ENTITY,
-            variables=variables,
-            dry_run=dry_run
+            variables=variables
         )
         return response['data']['createEntity']
 
-    def delete_entity(self, entity_id: str = None, dry_run: bool = False) -> Dict:
+    def delete_entity(self, entity_id: str = None) -> Dict:
         """ Deletes an entity from the graph.  Note this is a hard delete.
 
         args:
             entity_id (str): Entity ID for entity to delete
-            dry_run (bool): Execute in dry run mode.  Default is False.
         """
         variables = {
             'entityId': entity_id
         }
-        response = self._execute_query(DELETE_ENTITY, variables=variables, dry_run=dry_run)
+        response = self._execute_query(DELETE_ENTITY, variables=variables)
         return response['data']['deleteEntity']
+
+    def update_entity(self, entity_id: str = None, properties: Dict = None) -> Dict:
+        """
+        Update an existing entity.
+
+        args:
+            entity_id (str): The _id of the entity to udate
+            properties (dict): Dictionary of key/value entity properties
+        """
+        variables = {
+            'entityId': entity_id,
+            'properties': properties
+        }
+        response = self._execute_query(UPDATE_ENTITY, variables=variables)
+        return response['data']['updateEntity']
 
     def create_relationship(self, **kwargs) -> Dict:
         """
@@ -207,7 +212,6 @@ class JupiterOneClient:
             relationship_class (str): Value for _class of relationship
             from_entity_id (str): Entity ID of the source vertex
             to_entity_id (str): Entity ID of the destination vertex
-            dry_run (bool): Execute in dry run mode.  Default is False.
         """
         variables = {
             'relationshipKey': kwargs.pop('relationship_key'),
@@ -218,23 +222,20 @@ class JupiterOneClient:
         }
 
         properties = kwargs.pop('properties', None)
-        dry_run = kwargs.pop('dry_run', False)
         if properties:
             variables['properties'] = properties
 
         response = self._execute_query(
             query=CREATE_RELATIONSHIP,
-            variables=variables,
-            dry_run=dry_run
+            variables=variables
         )
         return response['data']['createRelationship']
 
-    def delete_relationship(self, relationship_id: str = None, dry_run: bool = False):
+    def delete_relationship(self, relationship_id: str = None):
         """ Deletes a relationship between two entities.
 
         args:
             relationship_id (str): The ID of the relationship
-            dry_run (bool): Execute in dry run mode.  Default is False.
         """
         variables = {
             'relationshipId': relationship_id
@@ -242,7 +243,6 @@ class JupiterOneClient:
 
         response = self._execute_query(
             DELETE_RELATIONSHIP,
-            variables=variables,
-            dry_run=dry_run
+            variables=variables
         )
         return response['data']['deleteRelationship']
