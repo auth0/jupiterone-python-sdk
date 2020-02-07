@@ -53,6 +53,19 @@ DELETE_ENTITY = """
   }
 """
 
+UPDATE_ENTITY = """
+  mutation UpdateEntity($entityId: String!, $properties: JSON) {
+    updateEntity(entityId: $entityId, properties: $properties) {
+      entity {
+        _id
+      }
+      vertex {
+        id
+      }
+    }
+  }
+"""
+
 CREATE_RELATIONSHIP = """
   mutation CreateRelationship(
     $relationshipKey: String!
