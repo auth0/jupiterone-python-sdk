@@ -60,13 +60,14 @@ def test_execute_query():
 
     j1 = JupiterOneClient(account='testAccount', token='testToken')
     query = "find Host with _id='1'"
-    variables = {'query': query}
-    include_deleted = False
+    variables = {
+        'query': query,
+        'includeDeleted': False
+    }
 
     response = j1._execute_query(
         query=QUERY_V1,
-        variables=variables,
-        include_deleted=include_deleted
+        variables=variables
     )
     assert 'data' in response
     assert 'queryV1' in response['data']
@@ -138,3 +139,4 @@ def test_tree_query_v1():
     assert type(response['edges']) == list
     assert type(response['vertices']) == list
     assert response['vertices'][0]['id'] == '1'
+    
