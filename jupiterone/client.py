@@ -91,10 +91,17 @@ class JupiterOneClient:
 
         response = requests.post(self.query_endpoint, headers=self.headers, json=data)
 
+        # It is still unclear if all responses will have a status
+        # code of 200 or if 429 will eventually be used to 
+        # indicate rate limitting.  J1 devs are aware.
         if response.status_code == 200:
             if response._content:
                 content = json.loads(response._content)
                 if 'errors' in content:
+                    errors = content['errors']
+                    if len(errors) == 1:
+                        if '429' in errors[0]['message']:
+                            raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
                     raise JupiterOneApiError(content.get('errors'))
                 return response.json()
 
