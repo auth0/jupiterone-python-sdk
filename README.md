@@ -10,14 +10,14 @@ A Python library for the [JupiterOne API](https://support.jupiterone.io/hc/en-us
 
 Requires Python 3.6+
 
-`pip install jupiteorne`
+`pip install jupiterone`
 
 
 ## Usage
 
 ##### Create a new client:
 
-```
+```python
 from jupiterone import JupiterOneClient
 
 j1 = JupiterOneClient(
@@ -28,7 +28,7 @@ j1 = JupiterOneClient(
 
 ##### Execute a query:
 
-```
+```python
 QUERY = 'FIND Host'
 query_result = j1.query_v1(QUERY)
 
@@ -41,15 +41,13 @@ query_result = j1.query_v1(QUERY, include_deleted=True)
 # Tree query
 QUERY = 'FIND Host RETURN TREE'
 query_result = jq.query_v1(QUERY)
-
-
 ```
 
 ##### Create an entity:
 
 Note that the CreateEntity mutation behaves like an upsert, so an non-existant entity will be created or an existing entity will be updated.
 
-```
+```python
 properties = {
     'myProperty': 'myValue',
     'tag.myTagProperty': 'value_will_be_a_tag'
@@ -69,7 +67,7 @@ print(entity['entity'])
 #### Update an existing entity:
 Only send in properties you want to add or update, other existing properties will not be modified.
 
-```
+```python
 properties = {
     'newProperty': 'newPropertyValue'
 }
@@ -82,12 +80,14 @@ j1.update_entity(
 
 
 #### Delete an entity:
-```
+
+```python
 j1.delete_entity(entit_id='<id-of-entity-to-delete>')
 ```
 
 ##### Create a relationship
-```
+
+```python
 j1.create_relationship(
     relationship_key='this_entity_relates_to_that_entity',
     relationship_type='my_relationship_type',
@@ -99,6 +99,6 @@ j1.create_relationship(
 
 ##### Delete a relationship
 
-```
+```python
 j1.delete_relationship(relationship_id='<id-of-relationship-to-delete>')
 ```
