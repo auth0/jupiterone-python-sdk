@@ -40,7 +40,7 @@ query_result = j1.query_v1(QUERY, include_deleted=True)
 
 # Tree query
 QUERY = 'FIND Host RETURN TREE'
-query_result = jq.query_v1(QUERY)
+query_result = j1.query_v1(QUERY)
 ```
 
 ##### Create an entity:
