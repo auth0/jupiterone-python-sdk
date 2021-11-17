@@ -10,6 +10,24 @@ QUERY_V1 = """
   }
 """
 
+QUERY_V2 = """
+  query J1QL_v2($query: String!, $variables: JSON, $flags: QueryV1Flags, $includeDeleted: Boolean, $cursor: String) {
+    queryV1(
+      query: $query
+      variables: $variables
+      deferredResponse: FORCE
+      flags: $flags
+      includeDeleted: $includeDeleted
+      cursor: $cursor
+    ) {
+      type
+      url
+      cursor
+      __typename
+    }
+  }
+"""
+
 CREATE_ENTITY = """
   mutation CreateEntity(
     $entityKey: String!

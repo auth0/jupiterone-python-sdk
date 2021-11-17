@@ -11,13 +11,15 @@ from retrying import retry
 from jupiterone.errors import (
     JupiterOneClientError,
     JupiterOneApiRetryError,
-    JupiterOneApiError
+    JupiterOneApiError,
+    JupiterOneQueryTimeoutError,
 )
 
 from jupiterone.constants import (
     J1QL_SKIP_COUNT,
     J1QL_LIMIT_COUNT,
     QUERY_V1,
+    QUERY_V2,
     CREATE_ENTITY,
     DELETE_ENTITY,
     UPDATE_ENTITY,
@@ -28,7 +30,6 @@ from jupiterone.constants import (
 def retry_on_429(exc):
     """ Used to trigger retry on rate limit """
     return isinstance(exc, JupiterOneApiRetryError)
-
 
 class JupiterOneClient:
     """ Python client class for the JupiterOne GraphQL API """
@@ -92,7 +93,7 @@ class JupiterOneClient:
         response = requests.post(self.query_endpoint, headers=self.headers, json=data)
 
         # It is still unclear if all responses will have a status
-        # code of 200 or if 429 will eventually be used to 
+        # code of 200 or if 429 will eventually be used to
         # indicate rate limitting.  J1 devs are aware.
         if response.status_code == 200:
             if response._content:
@@ -111,6 +112,89 @@ class JupiterOneClient:
         else:
             content = json.loads(response._content)
             raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
+
+    def _execute_cursor_query(self, query: str, variables: Dict = None) -> Dict:
+        response = self._execute_query(
+            query=query,
+            variables=variables
+        )
+        state_file_url = response['data']['queryV1']['url']
+        data_file_url = self._get_query_data_url(state_file_url)
+        return self._get_query_results(data_file_url)
+
+    @retry(**RETRY_OPTS)
+    def _get_query_data_url(self, state_file_url: str) -> Dict:
+        response = requests.get(state_file_url)
+        if response.status_code == 200:
+            results = response.json()
+            if 'url' in results:
+                return results['url']
+            else:
+                raise JupiterOneApiRetryError('Results not yet ready')
+
+        elif response.status_code in [429, 503]:
+            raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
+
+        else:
+            content = json.loads(response._content)
+            raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
+
+    def _get_query_results(self, results_file_url: str) -> Dict:
+        response = requests.get(results_file_url)
+        if response.status_code == 200:
+            if response._content:
+                content = json.loads(response._content)
+                if 'errors' in content:
+                    errors = content['errors']
+                    if len(errors) == 1:
+                        if '429' in errors[0]['message']:
+                            raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
+                    raise JupiterOneApiError(content.get('errors'))
+                return response.json()
+
+        elif response.status_code in [429, 503]:
+            raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
+
+        else:
+            content = json.loads(response._content)
+            raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
+
+    def query_v2(self, query: str, **kwargs) -> Dict:
+        """ Performs a V1 graph query
+            args:
+                query (str): Query text
+                cursor (str): Limit entity count
+                include_deleted (bool): Include recently deleted entities in query/search
+        """
+
+        cursor: str = kwargs.pop('cursor', None)
+        include_deleted: bool = kwargs.pop('include_deleted', False)
+
+        results: List = []
+        while True:
+            variables = {
+                'query': query,
+                'includeDeleted': include_deleted
+            }
+
+            if cursor is not None:
+                variables['cursor'] = cursor
+
+            result = self._execute_cursor_query(query=QUERY_V2, variables=variables)
+            data = result['data']
+
+            if 'cursor' in result:
+                cursor = result['cursor']
+
+            if 'vertices' in data and 'edges' in data:
+                return data
+
+            results.extend(data)
+
+            if cursor is None:
+                break
+
+        return {'data': results}
 
     def query_v1(self, query: str, **kwargs) -> Dict:
         """ Performs a V1 graph query
