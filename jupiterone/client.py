@@ -3,10 +3,10 @@
 # see https://github.com/PyCQA/pylint/issues/409
 
 import json
-from typing import Dict, List
-
 import requests
+from warnings import warn
 from retrying import retry
+from typing import Dict, List
 
 from jupiterone.errors import (
     JupiterOneClientError,
@@ -159,16 +159,13 @@ class JupiterOneClient:
             content = json.loads(response._content)
             raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
 
-    def query_v2(self, query: str, **kwargs) -> Dict:
+    def _cursor_query(self, query: str, cursor: str = None, include_deleted: bool = False) -> Dict:
         """ Performs a V1 graph query
             args:
                 query (str): Query text
                 cursor (str): Limit entity count
                 include_deleted (bool): Include recently deleted entities in query/search
         """
-
-        cursor: str = kwargs.pop('cursor', None)
-        include_deleted: bool = kwargs.pop('include_deleted', False)
 
         results: List = []
         while True:
@@ -196,18 +193,7 @@ class JupiterOneClient:
 
         return {'data': results}
 
-    def query_v1(self, query: str, **kwargs) -> Dict:
-        """ Performs a V1 graph query
-            args:
-                query (str): Query text
-                skip (int):  Skip entity count
-                limit (int): Limit entity count
-                include_deleted (bool): Include recently deleted entities in query/search
-        """
-        skip: int = kwargs.pop('skip', J1QL_SKIP_COUNT)
-        limit: int = kwargs.pop('limit', J1QL_LIMIT_COUNT)
-        include_deleted: bool = kwargs.pop('include_deleted', False)
-
+    def _limit_and_skip_query(self, query: str, skip: int = J1QL_SKIP_COUNT, limit: int = J1QL_LIMIT_COUNT, include_deleted: bool = False) -> Dict:
         results: List = []
         page: int = 0
 
@@ -235,6 +221,36 @@ class JupiterOneClient:
             page += 1
 
         return {'data': results}
+
+    def query_v1(self, query: str, **kwargs) -> Dict:
+        """ Performs a V1 graph query
+            args:
+                query (str): Query text
+                skip (int):  Skip entity count
+                limit (int): Limit entity count
+                cursor (str): Limit entity count
+                include_deleted (bool): Include recently deleted entities in query/search
+        """
+        uses_limit_and_skip: bool = 'skip' in kwargs.keys() or 'limit' in kwargs.keys()
+        skip: int = kwargs.pop('skip', J1QL_SKIP_COUNT)
+        limit: int = kwargs.pop('limit', J1QL_LIMIT_COUNT)
+        include_deleted: bool = kwargs.pop('include_deleted', False)
+        cursor: str = kwargs.pop('cursor', None)
+
+        if uses_limit_and_skip:
+            warn('limit and skip pagination is no longer a recommended method for pagination. To read more about using cursors checkout the JupiterOne documentation: https://support.jupiterone.io/hc/en-us/articles/360022722094#entityandrelationshipqueries', DeprecationWarning, stacklevel=2)
+            return self._limit_and_skip_query(
+                query=query,
+                skip=skip,
+                limit=limit,
+                include_deleted=include_deleted
+            )
+        else:
+            return self._cursor_query(
+                query=query,
+                cursor=cursor,
+                include_deleted=include_deleted
+            )
 
     def create_entity(self, **kwargs) -> Dict:
         """ Creates an entity in graph.  It will also update an existing entity.
