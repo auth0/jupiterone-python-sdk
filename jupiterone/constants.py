@@ -6,6 +6,24 @@ QUERY_V1 = """
     queryV1(query: $query, variables: $variables, dryRun: $dryRun, includeDeleted: $includeDeleted) {
       type
       data
+      url
+    }
+  }
+"""
+
+CURSOR_QUERY_V1 = """
+  query J1QL_v2($query: String!, $variables: JSON, $flags: QueryV1Flags, $includeDeleted: Boolean, $cursor: String) {
+    queryV1(
+      query: $query
+      variables: $variables
+      flags: $flags
+      includeDeleted: $includeDeleted
+      cursor: $cursor
+    ) {
+      type
+      data
+      cursor
+      __typename
     }
   }
 """
