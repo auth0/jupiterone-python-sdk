@@ -3,10 +3,11 @@
 # see https://github.com/PyCQA/pylint/issues/409
 
 import json
-import requests
-from warnings import warn
-from retrying import retry
 from typing import Dict, List
+
+import requests
+from retrying import retry
+from warnings import warn
 
 from jupiterone.errors import (
     JupiterOneClientError,
@@ -19,12 +20,12 @@ from jupiterone.constants import (
     J1QL_SKIP_COUNT,
     J1QL_LIMIT_COUNT,
     QUERY_V1,
-    QUERY_V2,
     CREATE_ENTITY,
     DELETE_ENTITY,
     UPDATE_ENTITY,
     CREATE_RELATIONSHIP,
     DELETE_RELATIONSHIP,
+    CURSOR_QUERY_V1,
     DEFERRED_RESULTS_IN_PROGRESS,
     DEFERRED_RESULTS_COMPLETED,
 )
@@ -43,8 +44,7 @@ class JupiterOneClient:
         'wait_exponential_multiplier': 1000,
         'wait_exponential_max': 10000,
         'stop_max_delay': 300000,
-        'retry_on_exception': retry_on_429,
-        'stop_max_attempt_number': 5
+        'retry_on_exception': retry_on_429
     }
 
     def __init__(self, account: str = None, token: str = None, url: str = DEFAULT_URL):
@@ -85,7 +85,7 @@ class JupiterOneClient:
     def _handle_api_response(self, response: requests.Response) -> Dict:
         # It is still unclear if all responses will have a status
         # code of 200 or if 429 will eventually be used to
-        # indicate rate limitting.  J1 devs are aware.
+        # indicate rate limiting.  J1 devs are aware.
         if response.status_code == 200:
             if response._content:
                 content = json.loads(response._content)
@@ -187,7 +187,7 @@ class JupiterOneClient:
             if cursor is not None:
                 variables['cursor'] = cursor
 
-            result = self._execute_cursor_query(query=QUERY_V2, variables=variables)
+            result = self._execute_cursor_query(query=CURSOR_QUERY_V1, variables=variables)
             data = result['data']
 
             if 'vertices' in data and 'edges' in data:
@@ -211,7 +211,6 @@ class JupiterOneClient:
                 'query': f"{query} SKIP {page * skip} LIMIT {limit}",
                 'includeDeleted': include_deleted
             }
-
             response = self._execute_query(
                 query=QUERY_V1,
                 variables=variables

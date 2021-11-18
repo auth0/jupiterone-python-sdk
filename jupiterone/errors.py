@@ -1,4 +1,3 @@
-from enum import Enum
 
 class JupiterOneClientError(Exception):
     """ Raised when error creating client """    

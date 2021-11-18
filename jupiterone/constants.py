@@ -1,5 +1,3 @@
-from enum import Enum
-
 J1QL_SKIP_COUNT = 250
 J1QL_LIMIT_COUNT = 250
 
@@ -16,7 +14,7 @@ QUERY_V1 = """
   }
 """
 
-QUERY_V2 = """
+CURSOR_QUERY_V1 = """
   query J1QL_v2($query: String!, $variables: JSON, $flags: QueryV1Flags, $includeDeleted: Boolean, $cursor: String) {
     queryV1(
       query: $query
