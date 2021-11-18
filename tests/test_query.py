@@ -87,7 +87,11 @@ def test_query_v1():
 
     j1 = JupiterOneClient(account='testAccount', token='testToken')
     query = "find Host with _id='1'"
-    response = j1.query_v1(query)
+    response = j1.query_v1(
+        query=query,
+        limit=250,
+        skip=0
+    )
 
     assert type(response) == dict
     assert len(response['data']) == 1
@@ -131,7 +135,11 @@ def test_tree_query_v1():
 
     j1 = JupiterOneClient(account='testAccount', token='testToken')
     query = "find Host with _id='1' return tree"
-    response = j1.query_v1(query)
+    response = j1.query_v1(
+        query=query,
+        limit=250,
+        skip=0
+    )
 
     assert type(response) == dict 
     assert 'edges' in response
@@ -139,4 +147,50 @@ def test_tree_query_v1():
     assert type(response['edges']) == list
     assert type(response['vertices']) == list
     assert response['vertices'][0]['id'] == '1'
-    
+
+def paginate_results_with_cursor():
+
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        response = {
+            'data': {
+                'queryV1': {
+                    'type': 'list',
+                    'data': [
+                        {
+                            'id': '1',
+                            'entity': {
+                                '_rawDataHashes': '1',
+                                '_integrationDefinitionId': '1',
+                                '_integrationName': '1',
+                                '_beginOn': 1580482083079,
+                                'displayName': 'host1',
+                                '_class': ['Host'],
+                                '_scope': 'aws_instance',
+                                '_version': 1,
+                                '_integrationClass': 'CSP',
+                                '_accountId': 'testAccount',
+                                '_id': '1',
+                                '_key': 'key1',
+                                '_type': ['aws_instance'],
+                                '_deleted': False,
+                                '_integrationInstanceId': '1',
+                                '_integrationType': 'aws',
+                                '_source': 'integration-managed',
+                                '_createdOn': 1578093840019
+                            },
+                            'properties': {
+                                'id': 'host1',
+                                'active': True
+                            }
+                        }
+                    ],
+                    'cursor': 'cursor_value'
+                }
+            }
+        }
+
+        return (200, headers, json.dumps(response))

@@ -1,5 +1,11 @@
+from enum import Enum
+
 J1QL_SKIP_COUNT = 250
 J1QL_LIMIT_COUNT = 250
+
+
+DEFERRED_RESULTS_IN_PROGRESS = 'IN_PROGRESS'
+DEFERRED_RESULTS_COMPLETED = 'COMPLETED'
 
 QUERY_V1 = """
   query J1QL($query: String!, $variables: JSON, $dryRun: Boolean, $includeDeleted: Boolean) {

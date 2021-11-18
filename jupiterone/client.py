@@ -24,7 +24,9 @@ from jupiterone.constants import (
     DELETE_ENTITY,
     UPDATE_ENTITY,
     CREATE_RELATIONSHIP,
-    DELETE_RELATIONSHIP
+    DELETE_RELATIONSHIP,
+    DEFERRED_RESULTS_IN_PROGRESS,
+    DEFERRED_RESULTS_COMPLETED,
 )
 
 def retry_on_429(exc):
@@ -79,6 +81,28 @@ class JupiterOneClient:
             raise JupiterOneClientError('token is required')
         self._token = value
 
+    def _handle_api_response(self, response: requests.Response) -> Dict:
+        # It is still unclear if all responses will have a status
+        # code of 200 or if 429 will eventually be used to
+        # indicate rate limitting.  J1 devs are aware.
+        if response.status_code == 200:
+            if response._content:
+                content = json.loads(response._content)
+                if 'errors' in content:
+                    errors = content['errors']
+                    if len(errors) == 1:
+                        if '429' in errors[0]['message']:
+                            raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
+                    raise JupiterOneApiError(content.get('errors'))
+                return response.json()
+
+        elif response.status_code in [429, 503]:
+            raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
+
+        else:
+            content = json.loads(response._content)
+            raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
+
     # pylint: disable=R1710
     @retry(**RETRY_OPTS)
     def _execute_query(self, query: str, variables: Dict = None) -> Dict:
@@ -106,7 +130,7 @@ class JupiterOneClient:
                     raise JupiterOneApiError(content.get('errors'))
                 return response.json()
 
-        elif response.status_code in [429, 500]:
+        elif response.status_code in [429, 503]:
             raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
 
         else:
@@ -127,10 +151,15 @@ class JupiterOneClient:
         response = requests.get(state_file_url)
         if response.status_code == 200:
             results = response.json()
-            if 'url' in results:
-                return results['url']
-            else:
+            if 'status' in results and results['status'] == DEFERRED_RESULTS_IN_PROGRESS:
                 raise JupiterOneApiRetryError('Results not yet ready')
+
+            elif 'status' in results and results['status'] == DEFERRED_RESULTS_COMPLETED:
+                return results['url']
+
+            else:
+                content = json.loads(response._content)
+                raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
 
         elif response.status_code in [429, 503]:
             raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
@@ -202,6 +231,7 @@ class JupiterOneClient:
                 'query': f"{query} SKIP {page * skip} LIMIT {limit}",
                 'includeDeleted': include_deleted
             }
+
             response = self._execute_query(
                 query=QUERY_V1,
                 variables=variables
