@@ -1,6 +1,7 @@
 import json
 import pytest
 import responses
+from collections import Counter
 
 from jupiterone.client import JupiterOneClient
 from jupiterone.constants import QUERY_V1, DEFERRED_RESULTS_COMPLETED
@@ -40,7 +41,9 @@ def build_state_response(response_code: int = 200, status: str = DEFERRED_RESULT
         return (response_code, headers, json.dumps(response))
     return request_callback
 
-def build_deferred_query_results(response_code: int = 200, cursor: str = None):
+def build_deferred_query_results(response_code: int = 200, cursor: str = None, max_pages: int = 1):
+    pages = Counter(requests=0)
+
     def request_callback(request):
         headers = {
             'Content-Type': 'application/json'
@@ -77,6 +80,13 @@ def build_deferred_query_results(response_code: int = 200, cursor: str = None):
                 }
             ]
         }
+
+        if cursor is not None and pages.get('requests') < max_pages:
+            response['cursor'] = cursor
+
+        pages.update(requests=1)
+
+        print('requestz', pages.get('requests'), cursor is not None, pages.get('requests') < max_pages)
 
         return (response_code, headers, json.dumps(response))
 
@@ -193,7 +203,7 @@ def test_cursor_query_v1():
 
     responses.add_callback(
         responses.GET, RESULTS_ENDPOINT,
-        callback=build_deferred_query_results(),
+        callback=build_deferred_query_results(cursor='cursor_value'),
         content_type='application/json',
     )
 
@@ -205,12 +215,12 @@ def test_cursor_query_v1():
     )
 
     assert type(response) == dict
-    assert len(response['data']) == 1
+    assert len(response['data']) == 2
     assert type(response['data']) == list
     assert response['data'][0]['entity']['_id'] == '1'
 
 @responses.activate
-def test_tree_query_v1():
+def test_limit_skip_tree_query_v1():
 
     def request_callback(request):
         headers = {
