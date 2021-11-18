@@ -3,58 +3,136 @@ import pytest
 import responses
 
 from jupiterone.client import JupiterOneClient
-from jupiterone.constants import QUERY_V1
+from jupiterone.constants import QUERY_V1, DEFERRED_RESULTS_COMPLETED
+from jupiterone.errors import JupiterOneApiError
 
-def request_callback(request):
-    headers = {
-        'Content-Type': 'application/json'
-    }
+API_ENDPOINT = 'https://api.us.jupiterone.io/graphql'
+STATE_FILE_ENDPOINT = 'https://api.us.jupiterone.io/state'
+RESULTS_ENDPOINT = 'https://api.us.jupiterone.io/results'
 
-    response = {
-        'data': {
-            'queryV1': {
-                'type': 'list',
-                'data': [
-                    {
-                        'id': '1',
-                        'entity': {
-                            '_rawDataHashes': '1',
-                            '_integrationDefinitionId': '1',
-                            '_integrationName': '1',
-                            '_beginOn': 1580482083079,
-                            'displayName': 'host1',
-                            '_class': ['Host'],
-                            '_scope': 'aws_instance',
-                            '_version': 1,
-                            '_integrationClass': 'CSP',
-                            '_accountId': 'testAccount',
-                            '_id': '1',
-                            '_key': 'key1',
-                            '_type': ['aws_instance'],
-                            '_deleted': False,
-                            '_integrationInstanceId': '1',
-                            '_integrationType': 'aws',
-                            '_source': 'integration-managed',
-                            '_createdOn': 1578093840019
-                        },
-                        'properties': {
-                            'id': 'host1',
-                            'active': True
-                        }
-                    }
-                ]
+def build_deferred_query_response(response_code: int = 200, url: str = STATE_FILE_ENDPOINT):
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        response = {
+            'data': {
+                'queryV1': {
+                    'url': url
+                }
             }
         }
-    }
-    return (200, headers, json.dumps(response))
+        return (response_code, headers, json.dumps(response))
+    return request_callback
 
+
+def build_state_response(response_code: int = 200, status: str = DEFERRED_RESULTS_COMPLETED, url: str = RESULTS_ENDPOINT):
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        response = {
+            'status': status,
+            'url': url
+        }
+        return (response_code, headers, json.dumps(response))
+    return request_callback
+
+def build_deferred_query_results(response_code: int = 200, cursor: str = None):
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        response = {
+            'data': [
+                {
+                    'id': '1',
+                    'entity': {
+                        '_rawDataHashes': '1',
+                        '_integrationDefinitionId': '1',
+                        '_integrationName': '1',
+                        '_beginOn': 1580482083079,
+                        'displayName': 'host1',
+                        '_class': ['Host'],
+                        '_scope': 'aws_instance',
+                        '_version': 1,
+                        '_integrationClass': 'CSP',
+                        '_accountId': 'testAccount',
+                        '_id': '1',
+                        '_key': 'key1',
+                        '_type': ['aws_instance'],
+                        '_deleted': False,
+                        '_integrationInstanceId': '1',
+                        '_integrationType': 'aws',
+                        '_source': 'integration-managed',
+                        '_createdOn': 1578093840019
+                    },
+                    'properties': {
+                        'id': 'host1',
+                        'active': True
+                    }
+                }
+            ]
+        }
+
+        return (response_code, headers, json.dumps(response))
+
+    return request_callback
+
+def build_results(response_code: int = 200):
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+
+        response = {
+            'data': {
+                'queryV1': {
+                    'type': 'list',
+                    'data': [
+                        {
+                            'id': '1',
+                            'entity': {
+                                '_rawDataHashes': '1',
+                                '_integrationDefinitionId': '1',
+                                '_integrationName': '1',
+                                '_beginOn': 1580482083079,
+                                'displayName': 'host1',
+                                '_class': ['Host'],
+                                '_scope': 'aws_instance',
+                                '_version': 1,
+                                '_integrationClass': 'CSP',
+                                '_accountId': 'testAccount',
+                                '_id': '1',
+                                '_key': 'key1',
+                                '_type': ['aws_instance'],
+                                '_deleted': False,
+                                '_integrationInstanceId': '1',
+                                '_integrationType': 'aws',
+                                '_source': 'integration-managed',
+                                '_createdOn': 1578093840019
+                            },
+                            'properties': {
+                                'id': 'host1',
+                                'active': True
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+        return (response_code, headers, json.dumps(response))
+    return request_callback
 
 @responses.activate
 def test_execute_query():
 
     responses.add_callback(
         responses.POST, 'https://api.us.jupiterone.io/graphql',
-        callback=request_callback,
+        callback=build_results(),
         content_type='application/json',
     )
 
@@ -73,15 +151,15 @@ def test_execute_query():
     assert 'queryV1' in response['data']
     assert len(response['data']['queryV1']['data']) == 1
     assert type(response['data']['queryV1']['data']) == list
-    assert response['data']['queryV1']['data'][0]['entity']['_id'] == '1' 
+    assert response['data']['queryV1']['data'][0]['entity']['_id'] == '1'
 
 
 @responses.activate
-def test_query_v1():
+def test_limit_skip_query_v1():
 
     responses.add_callback(
         responses.POST, 'https://api.us.jupiterone.io/graphql',
-        callback=request_callback,
+        callback=build_results(),
         content_type='application/json',
     )
 
@@ -98,6 +176,38 @@ def test_query_v1():
     assert type(response['data']) == list
     assert response['data'][0]['entity']['_id'] == '1'
 
+@responses.activate
+def test_cursor_query_v1():
+
+    responses.add_callback(
+        responses.POST, API_ENDPOINT,
+        callback=build_deferred_query_response(url=STATE_FILE_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, STATE_FILE_ENDPOINT,
+        callback=build_state_response(url=RESULTS_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, RESULTS_ENDPOINT,
+        callback=build_deferred_query_results(),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+
+    response = j1.query_v1(
+        query=query,
+    )
+
+    assert type(response) == dict
+    assert len(response['data']) == 1
+    assert type(response['data']) == list
+    assert response['data'][0]['entity']['_id'] == '1'
 
 @responses.activate
 def test_tree_query_v1():
@@ -148,7 +258,8 @@ def test_tree_query_v1():
     assert type(response['vertices']) == list
     assert response['vertices'][0]['id'] == '1'
 
-def paginate_results_with_cursor():
+@responses.activate
+def test_cursor_tree_query_v1():
 
     def request_callback(request):
         headers = {
@@ -157,40 +268,180 @@ def paginate_results_with_cursor():
 
         response = {
             'data': {
-                'queryV1': {
-                    'type': 'list',
-                    'data': [
-                        {
-                            'id': '1',
-                            'entity': {
-                                '_rawDataHashes': '1',
-                                '_integrationDefinitionId': '1',
-                                '_integrationName': '1',
-                                '_beginOn': 1580482083079,
-                                'displayName': 'host1',
-                                '_class': ['Host'],
-                                '_scope': 'aws_instance',
-                                '_version': 1,
-                                '_integrationClass': 'CSP',
-                                '_accountId': 'testAccount',
-                                '_id': '1',
-                                '_key': 'key1',
-                                '_type': ['aws_instance'],
-                                '_deleted': False,
-                                '_integrationInstanceId': '1',
-                                '_integrationType': 'aws',
-                                '_source': 'integration-managed',
-                                '_createdOn': 1578093840019
-                            },
-                            'properties': {
-                                'id': 'host1',
-                                'active': True
-                            }
-                        }
-                    ],
-                    'cursor': 'cursor_value'
-                }
+                'vertices': [
+                    {
+                        'id': '1',
+                        'entity': {},
+                        'properties': {}
+                    }
+                ],
+                'edges': []
             }
         }
 
         return (200, headers, json.dumps(response))
+
+    responses.add_callback(
+        responses.POST, API_ENDPOINT,
+        callback=build_deferred_query_response(url=STATE_FILE_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, STATE_FILE_ENDPOINT,
+        callback=build_state_response(url=RESULTS_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, RESULTS_ENDPOINT,
+        callback=request_callback,
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1' return tree"
+    response = j1.query_v1(
+        query=query
+    )
+
+    assert type(response) == dict
+    assert 'edges' in response
+    assert 'vertices' in response
+    assert type(response['edges']) == list
+    assert type(response['vertices']) == list
+    assert response['vertices'][0]['id'] == '1'
+
+@responses.activate
+def test_retry_on_limit_skip_query():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(response_code=429),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(response_code=503),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+    response = j1.query_v1(
+        query=query,
+        limit=250,
+        skip=0
+    )
+
+    assert type(response) == dict
+    assert len(response['data']) == 1
+    assert type(response['data']) == list
+    assert response['data'][0]['entity']['_id'] == '1'
+
+@responses.activate
+def test_retry_on_cursor_query():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(response_code=429),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(response_code=503),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.POST, API_ENDPOINT,
+        callback=build_deferred_query_response(url=STATE_FILE_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, STATE_FILE_ENDPOINT,
+        callback=build_state_response(response_code=503, url=RESULTS_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, STATE_FILE_ENDPOINT,
+        callback=build_state_response(url=RESULTS_ENDPOINT),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, RESULTS_ENDPOINT,
+        callback=build_deferred_query_results(),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+    response = j1.query_v1(
+        query=query
+    )
+
+    assert type(response) == dict
+    assert len(response['data']) == 1
+    assert type(response['data']) == list
+    assert response['data'][0]['entity']['_id'] == '1'
+
+@responses.activate
+def test_avoid_retry_on_limit_skip_query():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(response_code=404),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+    with pytest.raises(JupiterOneApiError):
+        j1.query_v1(
+            query=query,
+            limit=250,
+            skip=0
+        )
+
+@responses.activate
+def test_avoid_retry_on_cursor_query():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(response_code=404),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+    with pytest.raises(JupiterOneApiError):
+        j1.query_v1(
+            query=query,
+            limit=250,
+            skip=0
+        )
+
+@responses.activate
+def test_warn_limit_and_skip_deprecated():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+
+    with pytest.warns(DeprecationWarning):
+        j1.query_v1(
+            query=query,
+            limit=250,
+            skip=0
+        )
