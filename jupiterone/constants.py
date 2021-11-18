@@ -6,7 +6,6 @@ QUERY_V1 = """
     queryV1(query: $query, variables: $variables, dryRun: $dryRun, includeDeleted: $includeDeleted) {
       type
       data
-      url
     }
   }
 """
@@ -16,6 +15,7 @@ CURSOR_QUERY_V1 = """
     queryV1(
       query: $query
       variables: $variables
+      deferredResponse: DISABLED
       flags: $flags
       includeDeleted: $includeDeleted
       cursor: $cursor

@@ -133,15 +133,14 @@ class JupiterOneClient:
                 variables['cursor'] = cursor
 
             response = self._execute_query(query=CURSOR_QUERY_V1, variables=variables)
-            data = response['data']['queryV1']
+            data = response['data']['queryV1']['data']
 
             if 'vertices' in data and 'edges' in data:
                 return data
 
             results.extend(data)
 
-            if 'cursor' in response['data']['queryV1']:
-                print('cursor', response['data']['queryV1']['cursor'], len(data), len(results))
+            if 'cursor' in response['data']['queryV1'] and response['data']['queryV1']['cursor'] is not None:
                 cursor = response['data']['queryV1']['cursor']
             else:
                 break
