@@ -86,8 +86,6 @@ def build_deferred_query_results(response_code: int = 200, cursor: str = None, m
 
         pages.update(requests=1)
 
-        print('requestz', pages.get('requests'), cursor is not None, pages.get('requests') < max_pages)
-
         return (response_code, headers, json.dumps(response))
 
     return request_callback

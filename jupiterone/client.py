@@ -34,6 +34,7 @@ def retry_on_429(exc):
     """ Used to trigger retry on rate limit """
     return isinstance(exc, JupiterOneApiRetryError)
 
+
 class JupiterOneClient:
     """ Python client class for the JupiterOne GraphQL API """
     # pylint: disable=too-many-instance-attributes
