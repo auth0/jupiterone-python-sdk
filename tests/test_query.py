@@ -4,93 +4,12 @@ import responses
 from collections import Counter
 
 from jupiterone.client import JupiterOneClient
-from jupiterone.constants import QUERY_V1, DEFERRED_RESULTS_COMPLETED
+from jupiterone.constants import QUERY_V1
 from jupiterone.errors import JupiterOneApiError
 
-API_ENDPOINT = 'https://api.us.jupiterone.io/graphql'
-STATE_FILE_ENDPOINT = 'https://api.us.jupiterone.io/state'
-RESULTS_ENDPOINT = 'https://api.us.jupiterone.io/results'
-
-def build_deferred_query_response(response_code: int = 200, url: str = STATE_FILE_ENDPOINT):
-    def request_callback(request):
-        headers = {
-            'Content-Type': 'application/json'
-        }
-
-        response = {
-            'data': {
-                'queryV1': {
-                    'url': url
-                }
-            }
-        }
-        return (response_code, headers, json.dumps(response))
-    return request_callback
-
-
-def build_state_response(response_code: int = 200, status: str = DEFERRED_RESULTS_COMPLETED, url: str = RESULTS_ENDPOINT):
-    def request_callback(request):
-        headers = {
-            'Content-Type': 'application/json'
-        }
-
-        response = {
-            'status': status,
-            'url': url
-        }
-        return (response_code, headers, json.dumps(response))
-    return request_callback
-
-def build_deferred_query_results(response_code: int = 200, cursor: str = None, max_pages: int = 1):
+def build_results(response_code: int = 200, cursor: str = None, max_pages: int = 1):
     pages = Counter(requests=0)
 
-    def request_callback(request):
-        headers = {
-            'Content-Type': 'application/json'
-        }
-
-        response = {
-            'data': [
-                {
-                    'id': '1',
-                    'entity': {
-                        '_rawDataHashes': '1',
-                        '_integrationDefinitionId': '1',
-                        '_integrationName': '1',
-                        '_beginOn': 1580482083079,
-                        'displayName': 'host1',
-                        '_class': ['Host'],
-                        '_scope': 'aws_instance',
-                        '_version': 1,
-                        '_integrationClass': 'CSP',
-                        '_accountId': 'testAccount',
-                        '_id': '1',
-                        '_key': 'key1',
-                        '_type': ['aws_instance'],
-                        '_deleted': False,
-                        '_integrationInstanceId': '1',
-                        '_integrationType': 'aws',
-                        '_source': 'integration-managed',
-                        '_createdOn': 1578093840019
-                    },
-                    'properties': {
-                        'id': 'host1',
-                        'active': True
-                    }
-                }
-            ]
-        }
-
-        if cursor is not None and pages.get('requests') < max_pages:
-            response['cursor'] = cursor
-
-        pages.update(requests=1)
-
-        return (response_code, headers, json.dumps(response))
-
-    return request_callback
-
-def build_results(response_code: int = 200):
     def request_callback(request):
         headers = {
             'Content-Type': 'application/json'
@@ -132,7 +51,14 @@ def build_results(response_code: int = 200):
                 }
             }
         }
+
+        if cursor is not None and pages.get('requests') < max_pages:
+            response['data']['queryV1']['cursor'] = cursor
+
+        pages.update(requests=1)
+
         return (response_code, headers, json.dumps(response))
+
     return request_callback
 
 @responses.activate
@@ -188,20 +114,14 @@ def test_limit_skip_query_v1():
 def test_cursor_query_v1():
 
     responses.add_callback(
-        responses.POST, API_ENDPOINT,
-        callback=build_deferred_query_response(url=STATE_FILE_ENDPOINT),
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(cursor='cursor_value'),
         content_type='application/json',
     )
 
     responses.add_callback(
-        responses.GET, STATE_FILE_ENDPOINT,
-        callback=build_state_response(url=RESULTS_ENDPOINT),
-        content_type='application/json',
-    )
-
-    responses.add_callback(
-        responses.GET, RESULTS_ENDPOINT,
-        callback=build_deferred_query_results(cursor='cursor_value'),
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(),
         content_type='application/json',
     )
 
@@ -276,33 +196,26 @@ def test_cursor_tree_query_v1():
 
         response = {
             'data': {
-                'vertices': [
-                    {
-                        'id': '1',
-                        'entity': {},
-                        'properties': {}
+                'queryV1': {
+                    'type': 'tree',
+                    'data': {
+                        'vertices': [
+                            {
+                                'id': '1',
+                                'entity': {},
+                                'properties': {}
+                            }
+                        ],
+                        'edges': []
                     }
-                ],
-                'edges': []
+                }
             }
         }
 
         return (200, headers, json.dumps(response))
 
     responses.add_callback(
-        responses.POST, API_ENDPOINT,
-        callback=build_deferred_query_response(url=STATE_FILE_ENDPOINT),
-        content_type='application/json',
-    )
-
-    responses.add_callback(
-        responses.GET, STATE_FILE_ENDPOINT,
-        callback=build_state_response(url=RESULTS_ENDPOINT),
-        content_type='application/json',
-    )
-
-    responses.add_callback(
-        responses.GET, RESULTS_ENDPOINT,
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
         callback=request_callback,
         content_type='application/json',
     )
@@ -368,26 +281,8 @@ def test_retry_on_cursor_query():
     )
 
     responses.add_callback(
-        responses.POST, API_ENDPOINT,
-        callback=build_deferred_query_response(url=STATE_FILE_ENDPOINT),
-        content_type='application/json',
-    )
-
-    responses.add_callback(
-        responses.GET, STATE_FILE_ENDPOINT,
-        callback=build_state_response(response_code=503, url=RESULTS_ENDPOINT),
-        content_type='application/json',
-    )
-
-    responses.add_callback(
-        responses.GET, STATE_FILE_ENDPOINT,
-        callback=build_state_response(url=RESULTS_ENDPOINT),
-        content_type='application/json',
-    )
-
-    responses.add_callback(
-        responses.GET, RESULTS_ENDPOINT,
-        callback=build_deferred_query_results(),
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_results(),
         content_type='application/json',
     )
 
@@ -431,9 +326,7 @@ def test_avoid_retry_on_cursor_query():
     query = "find Host with _id='1'"
     with pytest.raises(JupiterOneApiError):
         j1.query_v1(
-            query=query,
-            limit=250,
-            skip=0
+            query=query
         )
 
 @responses.activate
