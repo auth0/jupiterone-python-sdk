@@ -222,9 +222,7 @@ def test_cursor_tree_query_v1():
 
     j1 = JupiterOneClient(account='testAccount', token='testToken')
     query = "find Host with _id='1' return tree"
-    response = j1.query_v1(
-        query=query
-    )
+    response = j1.query_v1(query)
 
     assert type(response) == dict
     assert 'edges' in response
