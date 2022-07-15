@@ -107,12 +107,19 @@ class JupiterOneClient:
                     raise JupiterOneApiError(content.get('errors'))
                 return response.json()
 
+        elif response.status_code == 401:
+            raise JupiterOneApiError('JupiterOne API query is unauthorized, check credentials.')
+
         elif response.status_code in [429, 503]:
             raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
 
         else:
-            content = json.loads(response._content)
-            raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
+            content = response._content
+            if isinstance(content, (bytes, bytearray)):
+                content = content.decode("utf-8")
+            if 'application/json' in response.headers.get('Content-Type', 'application/json') and '"error":' in content:
+                content = json.loads(content).get('error')
+            raise JupiterOneApiError('{}:{}'.format(response.status_code, content))
 
     def _cursor_query(self, query: str, cursor: str = None, include_deleted: bool = False) -> Dict:
         """ Performs a V1 graph query using cursor pagination

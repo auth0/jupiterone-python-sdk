@@ -61,6 +61,17 @@ def build_results(response_code: int = 200, cursor: str = None, max_pages: int =
 
     return request_callback
 
+
+def build_error_results(response_code: int, response_content, response_type: str = 'application/json'):
+    def request_callback(request):
+        headers = {
+            'Content-Type': response_type
+        }
+        return response_code, headers, response_content
+
+    return request_callback
+
+
 @responses.activate
 def test_execute_query():
 
@@ -344,3 +355,61 @@ def test_warn_limit_and_skip_deprecated():
             limit=250,
             skip=0
         )
+
+
+@responses.activate
+def test_unauthorized_query_v1():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_error_results(401, b'Unauthorized', 'text/plain'),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='bogusToken')
+    query = "find Host with _id='1' return tree"
+
+    with pytest.raises(JupiterOneApiError) as exc_info:
+        j1.query_v1(query)
+
+    assert type(exc_info.value) == JupiterOneApiError
+    assert exc_info.value.args[0] == 'JupiterOne API query is unauthorized, check credentials.'
+
+
+@responses.activate
+def test_unexpected_string_error_query_v1():
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_error_results(500, 'String exception on server', 'text/plain'),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='bogusToken')
+    query = "find Host with _id='1' return tree"
+
+    with pytest.raises(JupiterOneApiError) as exc_info:
+        j1.query_v1(query)
+
+    assert type(exc_info.value) == JupiterOneApiError
+    assert exc_info.value.args[0] == '500:String exception on server'
+
+
+@responses.activate
+def test_unexpected_json_error_query_v1():
+    error_json = {
+        'error': 'Bad Gateway'
+    }
+
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_error_results(502, json.dumps(error_json), ),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='bogusToken')
+    query = "find Host with _id='1' return tree"
+
+    with pytest.raises(JupiterOneApiError) as exc_info:
+        j1.query_v1(query)
+
+    assert type(exc_info.value) == JupiterOneApiError
+    assert exc_info.value.args[0] == '502:Bad Gateway'
