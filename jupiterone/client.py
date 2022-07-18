@@ -117,8 +117,9 @@ class JupiterOneClient:
             content = response._content
             if isinstance(content, (bytes, bytearray)):
                 content = content.decode("utf-8")
-            if 'application/json' in response.headers.get('Content-Type', 'application/json') and '"error":' in content:
-                content = json.loads(content).get('error')
+            if 'application/json' in response.headers.get('Content-Type', 'text/plain'):
+                data = json.loads(content)
+                content = data.get('error', data.get('errors', content))
             raise JupiterOneApiError('{}:{}'.format(response.status_code, content))
 
     def _cursor_query(self, query: str, cursor: str = None, include_deleted: bool = False) -> Dict:
