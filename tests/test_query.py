@@ -96,6 +96,33 @@ def test_query_v1():
 
 
 @responses.activate
+def test_401():
+    with pytest.raises(Exception) as ex:
+
+        def response_401_callback(r):
+            headers = {
+                'Content-Type': 'application/json'
+            }
+
+            response = {
+                'test': ['Unauthorized']
+            }
+            return (401, headers, json.dumps(response))
+
+        responses.add_callback(
+            responses.POST, 'https://api.us.jupiterone.io/graphql',
+            callback=response_401_callback,
+            content_type='application/text',
+        )
+
+        j1 = JupiterOneClient(account='testAccount', token='testToken')
+        query = "find Host with _id='1'"
+        j1.query_v1(query)
+        
+    assert '401: Unauthorized. Please supply a valid token' in str(ex.value)
+
+
+@responses.activate
 def test_tree_query_v1():
 
     def request_callback(request):
