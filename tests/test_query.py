@@ -119,7 +119,7 @@ def test_401():
         query = "find Host with _id='1'"
         j1.query_v1(query)
         
-    assert '401: Unauthorized. Please supply a valid token' in str(ex.value)
+    assert '401: Unauthorized. Please supply a valid account id and API token.' in str(ex.value)
 
 
 @responses.activate
