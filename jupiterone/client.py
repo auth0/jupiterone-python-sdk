@@ -105,12 +105,19 @@ class JupiterOneClient:
                     raise JupiterOneApiError(content.get('errors'))
                 return response.json()
 
+        elif response.status_code == 401:
+            raise JupiterOneApiError('401: Unauthorized. Please supply a valid account id and API token.')
+
         elif response.status_code in [429, 500]:
             raise JupiterOneApiRetryError('JupiterOne API rate limit exceeded')
 
         else:
-            content = json.loads(response._content)
-            raise JupiterOneApiError('{}:{}'.format(response.status_code, content.get('error')))
+            try:
+                content = json.loads(response._content)
+                raise JupiterOneApiError('{}: {}'.format(response.status_code, content.get('error') or 'Unknown Error'))
+            except ValueError as e:
+                raise JupiterOneApiError('{}: {}'.format(response.status_code, 'Unknown Error'));
+
 
     def query_v1(self, query: str, **kwargs) -> Dict:
         """ Performs a V1 graph query
