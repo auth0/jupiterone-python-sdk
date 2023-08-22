@@ -1,4 +1,4 @@
-# Copyright (c) 2020 Auth0
+# Copyright (c) 2020-2023 Okta
 
 from setuptools import setup, find_packages
 
@@ -8,12 +8,12 @@ install_reqs = [
 ]
 
 setup(name='jupiterone',
-      version='0.2.0',
+      version='0.2.1',
       description='A Python client for the JupiterOne API',
       license='MIT License',
       author='George Vauter',
-      author_email='george.vauter@auth0.com',
-      maintainer='Auth0',
+      author_email='george.vauter@okta.com',
+      maintainer='Okta',
       url='https://github.com/auth0/jupiterone-python-sdk',
       install_requires=install_reqs,
       classifiers=[
