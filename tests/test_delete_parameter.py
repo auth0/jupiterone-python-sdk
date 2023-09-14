@@ -14,7 +14,7 @@ def test_delete_parameter():
 
         response = {
             'data': {
-                'setParameter': {
+                'deleteParameter': {
                     'success': True
                 }
             }

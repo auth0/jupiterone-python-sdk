@@ -365,7 +365,7 @@ class JupiterOneClient:
             else:
                 break
 
-        return response['data']['parameter']
+        return {'parameters': parameter_list}
 
     def set_parameter(self, name: str = None, value: str | int | float | bool | list = None, secret: bool = False):
         """ Create/update a remote parameter.
