@@ -135,3 +135,47 @@ DELETE_RELATIONSHIP = """
     }
   }
 """
+
+GET_PARAMETER = """
+  query Query($name: String!) {
+    parameter (name: $name) {
+      name
+      value
+      secret
+      lastUpdatedOn
+    }
+  }
+"""
+
+GET_PARAMETER_LIST = """
+  query Query($limit: Int, $cursor: String!) {
+    parameterList (limit: $limit, cursor: $cursor) {
+      items {
+        name
+        value
+        secret
+        lastUpdatedOn
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+  }
+"""
+
+SET_PARAMETER = """
+  mutation Mutation($name: String!, $value: ParameterValue!, $secret: Boolean) {
+    setParameter (name: $name, value: $value, secret: $secret) {
+      success
+    }
+  }
+"""
+
+DELETE_PARAMETER = """
+  mutation Mutation($name: String!) {
+    deleteParameter (name: $name) {
+      success
+    }
+  }
+"""

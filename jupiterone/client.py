@@ -24,7 +24,11 @@ from jupiterone.constants import (
     UPDATE_ENTITY,
     CREATE_RELATIONSHIP,
     DELETE_RELATIONSHIP,
-    CURSOR_QUERY_V1
+    CURSOR_QUERY_V1,
+    GET_PARAMETER,
+    GET_PARAMETER_LIST,
+    SET_PARAMETER,
+    DELETE_PARAMETER
 )
 
 def retry_on_429(exc):
@@ -315,3 +319,86 @@ class JupiterOneClient:
             variables=variables
         )
         return response['data']['deleteRelationship']
+
+    def get_parameter(self, name: str = None):
+        """ Individual QUERY for one parameter.
+
+        args:
+            name (str): The parameter key or "name"
+        """
+        variables = {
+            'name': name
+        }
+
+        response = self._execute_query(
+            GET_PARAMETER,
+            variables=variables
+        )
+        return response['data']['parameter']
+
+    def get_parameter_list(self, limit: int = 100, cursor: str = None):
+        """ Bulk QUERY for parameters.
+
+        args:
+            limit (int): The maximum nmber of arguments to be returned in a page. Default value is 100.
+            cursor (str) [optional]: A pagination cursor for the initial query.
+        """
+        parameter_list: List = []
+
+        while True:
+            variables = {
+                'limit': limit
+            }
+
+            if cursor is not None:
+                variables['cursor'] = cursor
+
+            response = self._execute_query(
+                GET_PARAMETER_LIST,
+                variables=variables
+            )
+            params = response['data']['parameterList']['items']
+            parameter_list.extend(params)
+
+            if 'endCursor' in response['data']['parameterList']['pageInfo'] and response['data']['parameterList']['pageInfo']['endCursor'] is not None:
+                cursor = response['data']['parameterList']['pageInfo']['endCursor']
+            else:
+                break
+
+        return response['data']['parameter']
+
+    def set_parameter(self, name: str = None, value: str | int | float | bool | list = None, secret: bool = False):
+        """ Create/update a remote parameter.
+
+        args:
+            name (str): The parameter key or "name"
+            value (str|int|float|bool|list): The parameter value to be stored
+            secret (bool) [optional]: Flag to treat the value as sensitive data, defaults to False
+        """
+        variables = {
+            'name': name,
+            'value': value,
+            'secret': secret
+        }
+
+        response = self._execute_query(
+            SET_PARAMETER,
+            variables=variables
+        )
+        return response['data']['setParameter']
+
+    def delete_parameter(self, name: str = None):
+        """ Delete a parameter from the remote store.
+
+        args:
+            name (str): The parameter key or "name"
+        """
+        variables = {
+            'name': name
+        }
+
+        response = self._execute_query(
+            DELETE_PARAMETER,
+            variables=variables
+        )
+        return response['data']['deleteParameter']
