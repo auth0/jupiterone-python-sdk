@@ -115,13 +115,15 @@ set_status = j1.set_parameter(
 
 ##### Get a stored parameter
 
+Parameters are stored as a dictionary of the format `{'name': $parameterName, 'value': $parameterValue, 'secret': $isParameterSecret, 'lastUpdatedOn': $lastUpdateTimestamp}`
+
 ```python
 parameter = j1.get_parameter(
     name='name_of_parameter'
 )
 
-print(parameter) # Returns a dictionary of format {'name': $parameterName, 'value': $parameterValue, 'secret': $isParameterSecret, 'lastUpdatedOn': $lastUpdateTimestamp}
-print(parameter['value']) # Returns the stored value for that parameter. If parameter['seceret'] = True, then parameter['value'] will always return '[REDACTED]' when accessed by API
+print(parameter)
+print(parameter['value']) # If parameter['secret'] = True, then parameter['value'] will return '[REDACTED]'
 ```
 
 ##### Get all stored parameters
