@@ -115,7 +115,7 @@ set_status = j1.set_parameter(
 
 ##### Get a stored parameter
 
-Parameters are stored as a dictionary of the format `{'name': $parameterName, 'value': $parameterValue, 'secret': $isParameterSecret, 'lastUpdatedOn': $lastUpdateTimestamp}`
+Parameters are stored as a dictionary in the format `{'name': $parameterName, 'value': $parameterValue, 'secret': $isParameterSecret, 'lastUpdatedOn': $lastUpdateTimestamp}`
 
 ```python
 parameter = j1.get_parameter(
@@ -123,7 +123,7 @@ parameter = j1.get_parameter(
 )
 
 print(parameter)
-print(parameter['value']) # If parameter['secret'] = True, then parameter['value'] will return '[REDACTED]'
+print(parameter['value']) # If parameter['secret'] = True, then parameter['value'] will be '[REDACTED]'
 ```
 
 ##### Get all stored parameters
@@ -131,7 +131,7 @@ print(parameter['value']) # If parameter['secret'] = True, then parameter['value
 ```python
 parameterList = j1.get_parameter_list()
 
-print(parameterList) # Returns a dictionary of format {'parameters': parameter_list[]}
+print(parameterList) # Returns a dictionary in format {'parameters': list_of_parameters}
 print(parameterList[0]) # Returns the first parameter as a dictionary
 print(parameterList[0]['value']) # Returns the stored value of the first parameter
 ```
