@@ -102,3 +102,42 @@ j1.create_relationship(
 ```python
 j1.delete_relationship(relationship_id='<id-of-relationship-to-delete>')
 ```
+
+##### Create a parameter, or modify an existing parameter
+
+```python
+set_status = j1.set_parameter(
+    name='name_of_parameter', # If 'name_of_parameter' already exists, the value is modified
+    value='value_to_be_stored', # Can be a string, number, boolean, or list
+    secret=(True|False) # Optional, defaults to False
+)
+```
+
+##### Get a stored parameter
+
+```python
+parameter = j1.get_parameter(
+    name='name_of_parameter'
+)
+
+print(parameter) # Returns a dictionary of format {'name': $parameterName, 'value': $parameterValue, 'secret': $isParameterSecret, 'lastUpdatedOn': $lastUpdateTimestamp}
+print(parameter['value']) # Returns the stored value for that parameter. If parameter['seceret'] = True, then parameter['value'] will always return '[REDACTED]' when accessed by API
+```
+
+##### Get all stored parameters
+
+```python
+parameterList = j1.get_parameter_list()
+
+print(parameterList) # Returns a dictionary of format {'parameters': parameter_list[]}
+print(parameterList[0]) # Returns the first parameter as a dictionary
+print(parameterList[0]['value']) # Returns the stored value of the first parameter
+```
+
+##### Delete a stored parameter
+
+```python
+j1.delete_parameter(
+    name='name_of_parameter'
+)
+```
