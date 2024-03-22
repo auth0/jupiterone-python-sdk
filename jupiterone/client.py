@@ -4,6 +4,7 @@
 
 import json
 from typing import Dict, List
+import time
 
 import requests
 from retrying import retry
@@ -18,6 +19,8 @@ from jupiterone.errors import (
 from jupiterone.constants import (
     J1QL_SKIP_COUNT,
     J1QL_LIMIT_COUNT,
+    J1QL_DEFERRED_RESPONSE_POLL_TIMEOUT,
+    DEFERRED_RESPONSE_STATUS_COMPLETED,
     QUERY_V1,
     CREATE_ENTITY,
     DELETE_ENTITY,
@@ -122,36 +125,70 @@ class JupiterOneClient:
                 content = data.get('error', data.get('errors', content))
             raise JupiterOneApiError('{}:{}'.format(response.status_code, content))
 
-    def _cursor_query(self, query: str, cursor: str = None, include_deleted: bool = False) -> Dict:
+    def _cursor_query(self, query: str, cursor: str = None, include_deleted: bool = False, deferred_response: bool = False) -> Dict:
         """ Performs a V1 graph query using cursor pagination
             args:
                 query (str): Query text
                 cursor (str): A pagination cursor for the initial query
                 include_deleted (bool): Include recently deleted entities in query/search
+                deferred_response (bool): This option allows for a deferred response to be returned
         """
 
         results: List = []
         while True:
             variables = {
                 'query': query,
-                'includeDeleted': include_deleted
+                'includeDeleted': include_deleted,
+                'deferredResponse': 'FORCE' if deferred_response else 'DISABLED'
             }
 
             if cursor is not None:
                 variables['cursor'] = cursor
 
             response = self._execute_query(query=CURSOR_QUERY_V1, variables=variables)
-            data = response['data']['queryV1']['data']
+            result_type = response['data']['queryV1']['type']
 
-            if 'vertices' in data and 'edges' in data:
-                return data
+            if result_type == "deferred":
+                result_url = ""
+                while True:
+                    status_url = response['data']['queryV1']['url']
+                    status_response = requests.get(status_url, headers=self.headers)
 
-            results.extend(data)
+                    if status_response.status_code == 200:
+                        status_response_content = json.loads(status_response._content)
+                        if status_response_content["status"] == DEFERRED_RESPONSE_STATUS_COMPLETED:
+                            result_url = status_response_content["url"]
+                            break
+                        else:
+                            time.sleep(J1QL_DEFERRED_RESPONSE_POLL_TIMEOUT)
+                    else:
+                        status_response.raise_for_status()
 
-            if 'cursor' in response['data']['queryV1'] and response['data']['queryV1']['cursor'] is not None:
-                cursor = response['data']['queryV1']['cursor']
+                if result_url:
+                    result_response = requests.get(result_url, headers=self.headers)
+                    if status_response.status_code == 200:
+                        result_response_content = json.loads(result_response._content)
+
+                        results.extend(result_response_content["data"])
+
+                        if "cursor" in result_response_content and result_response_content["cursor"] is not None:
+                            cursor = result_response_content['cursor']
+                        else:
+                            break
+                    else:
+                        status_response.raise_for_status()
             else:
-                break
+                data = response['data']['queryV1']['data']
+
+                if 'vertices' in data and 'edges' in data:
+                    return data
+
+                results.extend(data)
+
+                if 'cursor' in response['data']['queryV1'] and response['data']['queryV1']['cursor'] is not None:
+                    cursor = response['data']['queryV1']['cursor']
+                else:
+                    break
 
         return {'data': results}
 
@@ -192,12 +229,14 @@ class JupiterOneClient:
                 limit (int): Limit entity count
                 cursor (str): A pagination cursor for the initial query
                 include_deleted (bool): Include recently deleted entities in query/search
+                deferred_response (bool): Set it True to allow 'FORCE' on the deferredResponse property. According to the documentation (https://docs.jupiterone.io/api/entity-relationship-queries): It is highly recommended that all automated processes use the deferredResponse='FORCE' option when issuing J1QL queries.
         """
         uses_limit_and_skip: bool = 'skip' in kwargs.keys() or 'limit' in kwargs.keys()
         skip: int = kwargs.pop('skip', J1QL_SKIP_COUNT)
         limit: int = kwargs.pop('limit', J1QL_LIMIT_COUNT)
         include_deleted: bool = kwargs.pop('include_deleted', False)
         cursor: str = kwargs.pop('cursor', None)
+        deferred_response: bool = kwargs.pop('deferred_response', False)
 
         if uses_limit_and_skip:
             warn('limit and skip pagination is no longer a recommended method for pagination. To read more about using cursors checkout the JupiterOne documentation: https://support.jupiterone.io/hc/en-us/articles/360022722094#entityandrelationshipqueries', DeprecationWarning, stacklevel=2)
@@ -211,7 +250,8 @@ class JupiterOneClient:
             return self._cursor_query(
                 query=query,
                 cursor=cursor,
-                include_deleted=include_deleted
+                include_deleted=include_deleted,
+                deferred_response=deferred_response
             )
 
     def create_entity(self, **kwargs) -> Dict:

@@ -72,6 +72,55 @@ def build_error_results(response_code: int, response_content, response_type: str
     return request_callback
 
 
+def build_deferred_response(response_code: int = 200, url: str = None):
+    pages = Counter(requests=0)
+
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        response = {
+            'data': {
+                'queryV1': {
+                    'type': 'deferred',
+                    'url': url
+                }
+            }
+        }
+        pages.update(requests=1)
+
+        return (response_code, headers, json.dumps(response))
+
+    return request_callback
+
+
+def build_deferred_status(response_code: int = 200, status: str = 'COMPLETED'):
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        response = {
+            'status': status,
+            'url': 'https://www.example.com/download'
+        }
+        return (response_code, headers, json.dumps(response))
+
+    return request_callback
+
+
+def build_deferred_result(response_code: int = 200):
+    def request_callback(request):
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        response = {
+            'type': 'list',
+            'data': [{'id': '1'}]
+        }
+        return (response_code, headers, json.dumps(response))
+
+    return request_callback
+
 @responses.activate
 def test_execute_query():
 
@@ -147,6 +196,46 @@ def test_cursor_query_v1():
     assert len(response['data']) == 2
     assert type(response['data']) == list
     assert response['data'][0]['entity']['_id'] == '1'
+
+@responses.activate
+def test_cursor_query_v1_deferred_response():
+
+    responses.add_callback(
+        responses.POST, 'https://api.us.jupiterone.io/graphql',
+        callback=build_deferred_response(url='https://www.example.com/status'),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, 'https://www.example.com/status',
+        callback=build_deferred_status(status="IN_PROGRESS"),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, 'https://www.example.com/status',
+        callback=build_deferred_status(),
+        content_type='application/json',
+    )
+
+    responses.add_callback(
+        responses.GET, 'https://www.example.com/download',
+        callback=build_deferred_result(),
+        content_type='application/json',
+    )
+
+    j1 = JupiterOneClient(account='testAccount', token='testToken')
+    query = "find Host with _id='1'"
+
+    response = j1.query_v1(
+        query=query,
+        deferred_response=True
+    )
+
+    assert type(response) == dict
+    assert len(response['data']) == 1
+    assert type(response['data']) == list
+    assert response['data'][0]['id'] == '1'
 
 @responses.activate
 def test_limit_skip_tree_query_v1():
