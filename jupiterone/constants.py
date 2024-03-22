@@ -1,5 +1,7 @@
 J1QL_SKIP_COUNT = 250
 J1QL_LIMIT_COUNT = 250
+J1QL_DEFERRED_RESPONSE_POLL_TIMEOUT = 5
+DEFERRED_RESPONSE_STATUS_COMPLETED = "COMPLETED"
 
 QUERY_V1 = """
   query J1QL($query: String!, $variables: JSON, $dryRun: Boolean, $includeDeleted: Boolean) {
@@ -11,11 +13,11 @@ QUERY_V1 = """
 """
 
 CURSOR_QUERY_V1 = """
-  query J1QL_v2($query: String!, $variables: JSON, $flags: QueryV1Flags, $includeDeleted: Boolean, $cursor: String) {
+  query J1QL_v2($query: String!, $variables: JSON, $flags: QueryV1Flags, $includeDeleted: Boolean, $cursor: String, $deferredResponse: DeferredResponseOption) {
     queryV1(
       query: $query
       variables: $variables
-      deferredResponse: DISABLED
+      deferredResponse: $deferredResponse
       flags: $flags
       includeDeleted: $includeDeleted
       cursor: $cursor
@@ -23,6 +25,7 @@ CURSOR_QUERY_V1 = """
       type
       data
       cursor
+      url
       __typename
     }
   }
